@@ -1,0 +1,36 @@
+version: '3.4'
+services:
+
+  auth:
+    build:
+      context: ./auth
+    ports:
+      - 3000:3000
+    environment:
+      FLASK_APP: ./app/main.py
+      DB_SERVICE: db
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: postgres
+    env_file:
+      - .env
+    command: flask run --host=0.0.0.0 --port=3000
+    depends_on:
+      - db
+
+  db:
+    build:
+      context: ./postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - 5433:5432
+    healthcheck:
+      test: "pg_isready -q -h db"
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 10
+
