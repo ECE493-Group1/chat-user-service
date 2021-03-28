@@ -103,12 +103,12 @@ def request_password_reset():
     if not session.query(Users).filter_by(email=email).one_or_none():
         return jsonify({"message": "email not registered"}), 400
 
-
-    # Send link to email address
+    token = jwt.encode({"password_reset_email": email, "exp": datetime.datetime.utcnow() + datetime.timedelta(minutes=10)}, app.config["JWT_SECRET_KEY"])
+ 
     msg = Message()
     msg.recipients = [email]
-    msg.subject = "Password Reset Link"
-    msg.body = "link"
+    msg.subject = "[CAT Chat] Password Reset Link"
+    msg.body = token
     mail.send(msg)
 
     return jsonify({"message": "password reset link sent"}), 200
@@ -116,13 +116,40 @@ def request_password_reset():
 
 @app.route("/update-password", methods=["POST"])
 def update_password():
-    return ''
+    reset_token = request.json.get("reset_token", None)
+    new_password = request.json.get("new_password", None)
+
+    if not reset_token or not new_password:
+        return jsonify({"message": "reset token or new password missing"}), 400
+    
+    email = None
+    try:
+        payload = jwt.decode(reset_token, app.config["JWT_SECRET_KEY"], algorithms="HS256")
+        email = payload["password_reset_email"]
+    except:
+        return jsonify({"error": "invalid token"}), 400
+
+    if not email:
+        return jsonify({"error": "invalid token"}), 400
+
+    session = Session()
+    user = session.query(Users).filter_by(email=email).one_or_none()
+    if not user:
+        return jsonify({"message": "invalid token"}), 400
+
+    hashed_new_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt())
+
+    user.password = hashed_new_password.decode('utf-8')
+    session.commit()
+    
+    return jsonify({"message": "password updated succesfully"}), 200
 
 
 # Requires authentication
 @app.route("/user-search", methods=["POST"])
 def user_search():
     return ''
+
 
 if __name__ == "__main__":
     app.run()
