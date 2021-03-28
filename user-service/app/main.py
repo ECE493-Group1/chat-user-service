@@ -19,9 +19,8 @@ app = Flask(__name__)
 app.config["JWT_SECRET_KEY"] = os.environ.get("JWT_SECRET_KEY")
 
 app.config["MAIL_SERVER"] = "smtp.gmail.com"
-app.config["MAIL_PORT"] = 465
-app.config["MAIL_SSL"] = True
-app.config["MAIL_TLS"] = True
+app.config["MAIL_PORT"] = 587
+app.config["MAIL_USE_TLS"] = True
 app.config["MAIL_USERNAME"] = os.environ.get("MAIL_USERNAME")
 app.config["MAIL_PASSWORD"] = os.environ.get("MAIL_PASSWORD")
 app.config["MAIL_DEFAULT_SENDER"] = os.environ.get("MAIL_USERNAME")
@@ -100,9 +99,9 @@ def request_password_reset():
     if not email:
         return jsonify({"message": "email missing"}), 400
     
-    # session = Session()
-    # if not session.query(Users).filter_by(email=email).one_or_none():
-    #     return jsonify({"message": "email not registered"}), 400
+    session = Session()
+    if not session.query(Users).filter_by(email=email).one_or_none():
+        return jsonify({"message": "email not registered"}), 400
 
 
     # Send link to email address
@@ -117,6 +116,12 @@ def request_password_reset():
 
 @app.route("/update-password", methods=["POST"])
 def update_password():
+    return ''
+
+
+# Requires authentication
+@app.route("/user-search", methods=["POST"])
+def user_search():
     return ''
 
 if __name__ == "__main__":
