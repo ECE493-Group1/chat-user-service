@@ -152,9 +152,6 @@ def user_search():
     session = Session()
     results = session.query(Users).filter(or_(Users.email.like('%' + search_query + '%'), Users.username.like('%' + search_query + '%')))
 
-    if not results:
-        return jsonify({"message": "no matches"}), 200
-
     usernames = list(map(lambda user: user.username, results))
 
     return jsonify({"results": usernames}), 200
