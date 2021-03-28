@@ -11,6 +11,8 @@ from sqlalchemy import Column, String, Integer, or_
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
+from functools import wraps
+
 import bcrypt
 import jwt
 
@@ -32,6 +34,9 @@ base = declarative_base()
 
 mail = Mail(app)
 
+Session = sessionmaker(db)
+session = Session()
+
 class Users(base):
     __tablename__ = 'users'
     user_id = Column(Integer, autoincrement=True, nullable=False, primary_key=True)
@@ -39,7 +44,26 @@ class Users(base):
     username = Column(String, nullable=False, unique=True)
     password = Column(String, nullable=False)
 
-Session = sessionmaker(db)
+def auth_required(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        auth_token = None
+        bearer = request.headers.get('Authorization')
+        if bearer:
+            auth_token = bearer.split()[1]
+        try:
+            payload = jwt.decode(auth_token, app.config["JWT_SECRET_KEY"], algorithms="HS256")
+            email = payload["email"]
+        except:
+            return jsonify({"message": "invalid auth token"}), 400
+
+        user = session.query(Users).filter_by(email=email).one_or_none()
+        if not user:
+            return jsonify({"message": "invalid auth token"}), 400
+        return f(user, *args, **kwargs)
+        
+    return wrapper
+
 
 @app.route("/login", methods=["POST"])
 def login():
@@ -48,7 +72,6 @@ def login():
     if not email or not password:
         return jsonify({"message": "email or password missing"}), 400
 
-    session = Session()
     user = session.query(Users).filter_by(email=email).one_or_none()
 
     if not user:
@@ -76,7 +99,6 @@ def register():
     if len(password) < 8:
         return jsonify({"message": "password must be 8 characters or more"}), 400
 
-    session = Session()
     if session.query(Users).filter_by(username=username).one_or_none():
         return jsonify({"message": "username already in use"}), 400
     
@@ -99,7 +121,6 @@ def request_password_reset():
     if not email:
         return jsonify({"message": "email missing"}), 400
     
-    session = Session()
     if not session.query(Users).filter_by(email=email).one_or_none():
         return jsonify({"message": "email not registered"}), 400
 
@@ -127,9 +148,8 @@ def update_password():
         payload = jwt.decode(reset_token, app.config["JWT_SECRET_KEY"], algorithms="HS256")
         email = payload["password_reset_email"]
     except:
-        return jsonify({"error": "invalid token"}), 400
+        return jsonify({"message": "invalid token"}), 400
 
-    session = Session()
     user = session.query(Users).filter_by(email=email).one_or_none()
     if not user:
         return jsonify({"message": "invalid token"}), 400
@@ -143,13 +163,13 @@ def update_password():
 
 
 @app.route("/user-search", methods=["POST"])
-def user_search():
+@auth_required
+def user_search(current_user):
     search_query = request.json.get("search_query", None)
 
     if not search_query:
         return jsonify({"message": "no query provided"}), 400
-
-    session = Session()
+    
     results = session.query(Users).filter(or_(Users.email.like('%' + search_query + '%'), Users.username.like('%' + search_query + '%')))
 
     usernames = list(map(lambda user: user.username, results))
