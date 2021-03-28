@@ -27,10 +27,3 @@ services:
       POSTGRES_PASSWORD: postgres
     ports:
       - 5433:5432
-    healthcheck:
-      test: "pg_isready -q -h db"
-      interval: 30s
-      timeout: 10s
-      start_period: 30s
-      retries: 10
-
