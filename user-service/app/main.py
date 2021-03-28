@@ -7,7 +7,7 @@ from flask import request
 from flask_mail import Mail, Message
 
 from sqlalchemy import create_engine
-from sqlalchemy import Column, String, Integer
+from sqlalchemy import Column, String, Integer, or_
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
@@ -129,9 +129,6 @@ def update_password():
     except:
         return jsonify({"error": "invalid token"}), 400
 
-    if not email:
-        return jsonify({"error": "invalid token"}), 400
-
     session = Session()
     user = session.query(Users).filter_by(email=email).one_or_none()
     if not user:
@@ -145,10 +142,22 @@ def update_password():
     return jsonify({"message": "password updated succesfully"}), 200
 
 
-# Requires authentication
 @app.route("/user-search", methods=["POST"])
 def user_search():
-    return ''
+    search_query = request.json.get("search_query", None)
+
+    if not search_query:
+        return jsonify({"message": "no query provided"}), 400
+
+    session = Session()
+    results = session.query(Users).filter(or_(Users.email.like('%' + search_query + '%'), Users.username.like('%' + search_query + '%')))
+
+    if not results:
+        return jsonify({"message": "no matches"}), 200
+
+    usernames = list(map(lambda user: user.username, results))
+
+    return jsonify({"results": usernames}), 200
 
 
 if __name__ == "__main__":
