@@ -5,6 +5,7 @@ from flask import Flask
 from flask import jsonify
 from flask import request
 from flask_mail import Mail, Message
+from flask_cors import CORS
 
 from sqlalchemy import create_engine
 from sqlalchemy import Column, String, Integer, or_
@@ -17,6 +18,9 @@ import bcrypt
 import jwt
 
 app = Flask(__name__)
+
+# CORS(app, resources={r"/*" : {"origins": os.environ.get("CHAT_UI_HOST") + ":" + os.environ.get("CHAT_UI_PORT")}})
+CORS(app)
 
 app.config["JWT_SECRET_KEY"] = os.environ.get("JWT_SECRET_KEY")
 
@@ -81,7 +85,7 @@ def login():
         return jsonify({"message": "invalid password"}), 400
 
     token = jwt.encode({"email": email, "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=12)}, app.config["JWT_SECRET_KEY"])
-    return jsonify({"message": "login successful", "token": token}), 200
+    return jsonify({"message": "login successful", "token": token, "username": user.username}), 200
 
 
 @app.route("/register", methods=["POST"])
@@ -129,7 +133,7 @@ def request_password_reset():
     msg = Message()
     msg.recipients = [email]
     msg.subject = "[CAT Chat] Password Reset Link"
-    msg.body = token
+    msg.body = "http://localhost:8080/#/change-password/" + token
     mail.send(msg)
 
     return jsonify({"message": "password reset link sent"}), 200

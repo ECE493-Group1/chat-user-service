@@ -1,4 +1,5 @@
 Flask==1.1.2
+Flask-Cors==3.0.10
 Flask-Mail==0.9.1
 SQLAlchemy==1.4.2
 PyJWT==2.0.1
