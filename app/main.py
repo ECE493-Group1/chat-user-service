@@ -125,10 +125,12 @@ def request_password_reset():
     if not email:
         return jsonify({"message": "email missing"}), 400
     
-    if not session.query(Users).filter_by(email=email).one_or_none():
+    user = session.query(Users).filter_by(email=email).one_or_none()
+
+    if not user:
         return jsonify({"message": "email not registered"}), 400
 
-    token = jwt.encode({"password_reset_email": email, "exp": datetime.datetime.utcnow() + datetime.timedelta(minutes=10)}, app.config["JWT_SECRET_KEY"])
+    token = jwt.encode({"email": email, "password": user.password, "exp": datetime.datetime.utcnow() + datetime.timedelta(minutes=10)}, app.config["JWT_SECRET_KEY"])
  
     msg = Message()
     msg.recipients = [email]
@@ -148,14 +150,19 @@ def update_password():
         return jsonify({"message": "reset token or new password missing"}), 400
     
     email = None
+    token_password = None
     try:
         payload = jwt.decode(reset_token, app.config["JWT_SECRET_KEY"], algorithms="HS256")
-        email = payload["password_reset_email"]
+        email = payload["email"]
+        token_password = payload["password"]
     except:
         return jsonify({"message": "invalid token"}), 400
 
     user = session.query(Users).filter_by(email=email).one_or_none()
     if not user:
+        return jsonify({"message": "invalid token"}), 400
+
+    if token_password != user.password:
         return jsonify({"message": "invalid token"}), 400
 
     hashed_new_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt())
@@ -164,6 +171,31 @@ def update_password():
     session.commit()
     
     return jsonify({"message": "password updated succesfully"}), 200
+
+@app.route("/verify-reset-token", methods=["POST"])
+def verify_reset_token():
+    reset_token = request.json.get("reset_token", None)
+
+    if not reset_token:
+        return jsonify({"message": "reset token missing"}), 400
+    
+    email = None
+    token_password = None
+    try:
+        payload = jwt.decode(reset_token, app.config["JWT_SECRET_KEY"], algorithms="HS256")
+        email = payload["email"]
+        token_password = payload["password"]
+    except:
+        return jsonify({"message": "invalid token"}), 400
+
+    user = session.query(Users).filter_by(email=email).one_or_none()
+    if not user:
+        return jsonify({"message": "invalid token"}), 400
+
+    if token_password != user.password:
+        return jsonify({"message": "invalid token"}), 400
+    
+    return jsonify({"message": "token verification successful"}), 200
 
 
 @app.route("/user-search", methods=["POST"])
