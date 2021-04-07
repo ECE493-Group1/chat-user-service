@@ -84,7 +84,7 @@ def login():
     if not bcrypt.checkpw(password.encode('utf-8'), user.password.encode('utf-8')):
         return jsonify({"message": "invalid password"}), 400
 
-    token = jwt.encode({"email": email, "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=12)}, app.config["JWT_SECRET_KEY"])
+    token = jwt.encode({"email": email, "user_id": user.user_id, "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=12)}, app.config["JWT_SECRET_KEY"])
     return jsonify({"message": "login successful", "token": token, "username": user.username}), 200
 
 
