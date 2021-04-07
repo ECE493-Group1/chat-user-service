@@ -79,7 +79,7 @@ def login():
     user = session.query(Users).filter_by(email=email).one_or_none()
 
     if not user:
-        return jsonify({"message": "invalid email"})
+        return jsonify({"message": "invalid email"}), 400
 
     if not bcrypt.checkpw(password.encode('utf-8'), user.password.encode('utf-8')):
         return jsonify({"message": "invalid password"}), 400
