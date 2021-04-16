@@ -4,49 +4,22 @@ import datetime
 from flask import Flask
 from flask import jsonify
 from flask import request
-from flask_mail import Mail, Message
-from flask_cors import CORS
+from flask_mail import Message
+from flask import Blueprint
+from flask import current_app
 
-from sqlalchemy import create_engine
 from sqlalchemy import Column, String, Integer, or_
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+
+from .models import Users
+from .database import session
+from .mail import mail
 
 from functools import wraps
 
 import bcrypt
 import jwt
 
-app = Flask(__name__)
-
-# CORS(app, resources={r"/*" : {"origins": os.environ.get("CHAT_UI_HOST") + ":" + os.environ.get("CHAT_UI_PORT")}})
-CORS(app)
-
-app.config["JWT_SECRET_KEY"] = os.environ.get("JWT_SECRET_KEY")
-
-app.config["MAIL_SERVER"] = "smtp.gmail.com"
-app.config["MAIL_PORT"] = 587
-app.config["MAIL_USE_TLS"] = True
-app.config["MAIL_USERNAME"] = os.environ.get("MAIL_USERNAME")
-app.config["MAIL_PASSWORD"] = os.environ.get("MAIL_PASSWORD")
-app.config["MAIL_DEFAULT_SENDER"] = os.environ.get("MAIL_USERNAME")
-
-db_string = f'postgresql://{os.environ.get("DB_USER")}:{os.environ.get("DB_USER")}@{os.environ.get("DB_SERVICE")}:{os.environ.get("DB_PORT")}/{os.environ.get("DB_NAME")}'
-
-db = create_engine(db_string)
-base = declarative_base()
-
-mail = Mail(app)
-
-Session = sessionmaker(db)
-session = Session()
-
-class Users(base):
-    __tablename__ = 'users'
-    user_id = Column(Integer, autoincrement=True, nullable=False, primary_key=True)
-    email = Column(String, nullable=False, unique=True)
-    username = Column(String, nullable=False, unique=True)
-    password = Column(String, nullable=False)
+bp = Blueprint("routes", __name__)
 
 def auth_required(f):
     @wraps(f)
@@ -56,7 +29,7 @@ def auth_required(f):
         if bearer:
             auth_token = bearer.split()[1]
         try:
-            payload = jwt.decode(auth_token, app.config["JWT_SECRET_KEY"], algorithms="HS256")
+            payload = jwt.decode(auth_token, current_app.config["JWT_SECRET_KEY"], algorithms="HS256")
             email = payload["email"]
         except:
             return jsonify({"message": "invalid auth token"}), 400
@@ -69,7 +42,7 @@ def auth_required(f):
     return wrapper
 
 
-@app.route("/login", methods=["POST"])
+@bp.route("/login", methods=["POST"])
 def login():
     email = request.json.get("email", None)
     password = request.json.get("password", None)
@@ -84,11 +57,11 @@ def login():
     if not bcrypt.checkpw(password.encode('utf-8'), user.password.encode('utf-8')):
         return jsonify({"message": "invalid password"}), 400
 
-    token = jwt.encode({"email": email, "user_id": user.user_id, "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=12)}, app.config["JWT_SECRET_KEY"])
+    token = jwt.encode({"email": email, "user_id": user.user_id, "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=12)}, current_app.config["JWT_SECRET_KEY"])
     return jsonify({"message": "login successful", "token": token, "username": user.username}), 200
 
 
-@app.route("/register", methods=["POST"])
+@bp.route("/register", methods=["POST"])
 def register():
     email = request.json.get("email", None)
     username = request.json.get("username", None)
@@ -118,7 +91,7 @@ def register():
     return jsonify({"message": "registration successful"}), 200
 
 
-@app.route("/request-password-reset", methods=["POST"])
+@bp.route("/request-password-reset", methods=["POST"])
 def request_password_reset():
     email = request.json.get("email", None)
 
@@ -130,7 +103,7 @@ def request_password_reset():
     if not user:
         return jsonify({"message": "email not registered"}), 400
 
-    token = jwt.encode({"email": email, "password": user.password, "exp": datetime.datetime.utcnow() + datetime.timedelta(minutes=10)}, app.config["JWT_SECRET_KEY"])
+    token = jwt.encode({"email": email, "password": user.password, "exp": datetime.datetime.utcnow() + datetime.timedelta(minutes=10)}, current_app.config["JWT_SECRET_KEY"])
  
     msg = Message()
     msg.recipients = [email]
@@ -141,7 +114,7 @@ def request_password_reset():
     return jsonify({"message": "password reset link sent"}), 200
 
 
-@app.route("/update-password", methods=["POST"])
+@bp.route("/update-password", methods=["POST"])
 def update_password():
     reset_token = request.json.get("reset_token", None)
     new_password = request.json.get("new_password", None)
@@ -152,7 +125,7 @@ def update_password():
     email = None
     token_password = None
     try:
-        payload = jwt.decode(reset_token, app.config["JWT_SECRET_KEY"], algorithms="HS256")
+        payload = jwt.decode(reset_token, current_app.config["JWT_SECRET_KEY"], algorithms="HS256")
         email = payload["email"]
         token_password = payload["password"]
     except:
@@ -172,7 +145,7 @@ def update_password():
     
     return jsonify({"message": "password updated succesfully"}), 200
 
-@app.route("/verify-reset-token", methods=["POST"])
+@bp.route("/verify-reset-token", methods=["POST"])
 def verify_reset_token():
     reset_token = request.json.get("reset_token", None)
 
@@ -182,7 +155,7 @@ def verify_reset_token():
     email = None
     token_password = None
     try:
-        payload = jwt.decode(reset_token, app.config["JWT_SECRET_KEY"], algorithms="HS256")
+        payload = jwt.decode(reset_token, current_app.config["JWT_SECRET_KEY"], algorithms="HS256")
         email = payload["email"]
         token_password = payload["password"]
     except:
@@ -198,7 +171,7 @@ def verify_reset_token():
     return jsonify({"message": "token verification successful"}), 200
 
 
-@app.route("/user-search", methods=["POST"])
+@bp.route("/user-search", methods=["POST"])
 @auth_required
 def user_search(current_user):
     search_query = request.json.get("search_query", None)
@@ -211,7 +184,3 @@ def user_search(current_user):
     usernames = list(map(lambda user: user.username, results))
 
     return jsonify({"results": usernames}), 200
-
-
-if __name__ == "__main__":
-    app.run()
