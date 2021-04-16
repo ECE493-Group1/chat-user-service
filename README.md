@@ -9,6 +9,10 @@ It is recommended to use a virtual environment for installing the app.
 ```
 pip3 install -e .
 ```
+### Run
+```
+flask run --port 3000
+```
 
 ## Running the tests
 
