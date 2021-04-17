@@ -33,7 +33,7 @@ def test_missing_password(client, app, session):
     assert resp.json["message"] == "email, username or password missing"
 
 
-def test_username_four_chars_or_less(client, app, session):
+def test_username_less_than_four_chars(client, app, session):
     test_email = "testuser@email.com"
     test_username = "abc"
     test_password = "password123"
@@ -73,16 +73,3 @@ def test_username_already_exists(client, app, session):
     assert resp.status_code == 400
 
     assert resp.json["message"] == "username already in use"
-
-
-def test_successful_login(client, app, session, auth):
-    resp = auth.register()
-    assert resp.status_code == 200
-
-    body = {
-        "email": auth.email,
-        "password": auth.password
-    }
-    resp = client.post("/login", json=body)
-
-    assert resp.status_code == 200
